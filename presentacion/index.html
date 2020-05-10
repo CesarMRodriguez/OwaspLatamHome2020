@@ -1,0 +1,1311 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<title>reveal.js</title>
+
+		<link rel="stylesheet" href="css/reset.css">
+		<link rel="stylesheet" href="css/reveal.css">
+		<link rel="stylesheet" href="css/theme/simple.css">
+
+		<!-- Theme used for syntax highlighting of code -->
+		<link rel="stylesheet" href="lib/css/monokai.css">
+
+		<!-- Printing and PDF exports -->
+		<script>
+			var link = document.createElement( 'link' );
+			link.rel = 'stylesheet';
+			link.type = 'text/css';
+			link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+			document.getElementsByTagName( 'head' )[0].appendChild( link );
+		</script>
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				<section data-background-image="images/19366.jpg">
+					<h2>Pentesting en Android Con Frida</h2>
+					<p>
+						<small>Creado por <a href="https://www.linkedin.com/in/cesar-mario-rodriguez/">Cesar Rodriguez</a> - <a href="https://twitter.com/warlockk87">@warlockk87</a></small>
+					</p>
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<h2>#whoami</h2>
+					<br>
+					<ul>
+						<li>Security Researcher para Infobyte Security</li>
+						<li>Pentester de WebApps y aplicaciones Mobile</li>
+						<li>Desarrollador Java</li>
+						<li>Aficionado a los CTF</li>
+						<li>Aficionado a los tabletop RPGs</li>
+						<li>Jugador Mobile Legends (y otros MOBAS)</li>
+					</ul>
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<h2>Resumen de contenido</h2>
+					<br>
+					<ul>
+						<li>Introduccion a Frida</li>
+						<li>Ejemplos básicos de instrumentación dinámico con Frida</li>
+						<li>Bypass de network security configuration</li>
+						<li>Bypass de certificate pinning</li>
+						<li>Bypass de controles de rooteo</li>
+						<li>Bruteforcing de PIN</li>
+						<li>Mocking con Frida</li>
+						<li>Tools destacadas que utilizan el framework de Frida</li>
+					</ul>
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<h2>Introduccion a Frida</h2>
+					<br>
+					<ul>
+						<li>Creada por <a href="https://twitter.com/oleavr">@oleavr</a></li>
+						<li>Toolkit de instrumentación dinámica</li> 
+						<li>Inyecta el motor V8 (chrome) en el proceso objetivo y permite ejecutar Javascript en el mismo.</li>
+						<li>Multiplataforma (Windows, mac, Linux, Android, iOS)
+						Open-source</li>
+						<li>Multiples tools creadas en base a Frida</li>
+						<li>Casos de uso principales:
+							<ul>
+								<li>Reversing</li>
+								<li>Profiling</li>
+								<li>Agregar funcionalidades sin deployar nueva aplicación.</li>
+								<li>Pentesting (deshabilitar protecciones)</li>
+								<li>Generar mocks de servicios / clases / drivers</li>
+								<li>Automatización de pruebas???</li>
+							</ul>
+						</li>
+					</ul>
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<h2>Por que Frida?</h2>
+					<br>
+					<ul>
+						<li>En pentesting se usan muchas tools muy especificas
+							<ul>
+								<li>Cada una tiene su sintaxis, sus trucos y  requerimientos de instalacion</li>
+								<li>Casos de uso de herramientas muy especificos</li>
+								<li>Muchisimas situaciones no contempladas o bugs que requieren muchos skills para resolver</li>
+							</ul>
+						</li>
+						<li>Facil para hacer tracking de funciones y valores de entrada y salida</li>
+						<li>Debug sin recompilar aplicacion (muchos console.log)</li>
+						<li>Acelerar el proceso de reversing</li>
+						<li>Evadir controles de seguridad sin recompilar la aplicacion</li>
+						<li>Modificar el comportamiento para probar algunas situaciones complejas</li>
+					</ul>
+				</section>
+				
+				<section data-background-image="images/19366.jpg">
+					<h2>Modos de operacion</h2>
+					<br>
+					<ul>
+						<li>Inyectado:
+							<ul>
+								<li>En el dispositivo hay un componente frida-server</li>
+								<li>A través del frida-server se inyecta el agente frida</li>
+								<li>Requiere el celular rooteado</li>
+								<li>Si el server crashea, hay que lanzarlo de nuevo</li>
+							</ul>
+						</li>
+					<br>
+						<li>Embebido:
+							<ul>
+								<li>Usa una librería frida-gadget que se tiene que agregar al apk.</li>
+								<li>Se tiene que volver a firmar el aplicativo.</li>
+								<li>No es necesario usar el celular rooteado.</li>
+								<li>Usar objection para automatizar el proceso.</li>
+								<li>Se tiene que efectuar el proceso por cada aplicativo a probar.</li>
+							</ul>
+						</li>
+					</ul>
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<h2>Instalacion de Frida</h2>
+					<p style="text-align:left;">Descargar el server de <a href="https://github.com/frida/frida/releases">Frida releases</a></p>
+				 	
+				 	<p style="text-align:left;">Subir el server a un directorio con permisos de escritura</p>
+				 	<pre><code>adb push frida-server-12.8.20-android-x86 /data</code></pre>
+
+				 	<p style="text-align:left;">Cambiar permisos a ejecucion:</p>
+				 	<pre><code>adb shell chmod +x /data/frida-server-12.8.20-android-x86</code></pre>
+
+				 	<p style="text-align:left;">Correr el proceso:</p>
+				 	<pre><code>adb shell 
+/data/frida-server-12.8.20-android-x86 &</code></pre>
+
+					<p style="text-align:left;">Comprobar que funiona (ver procesos corriendo del Android):</p>
+				 	<pre><code>frida-ps -U</code></pre> 
+				 	
+				 	<p style="text-align:left;">Fijarse que exista en la lista de procesos uno que se llama <b>zygote</b></p> 
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<h2>Opciones de linea de comando</h2>
+					<pre><code>
+Usage: frida [options] target
+
+Options:
+  -D ID, --device=ID    connect to device with the given ID
+  -U, --usb             connect to USB device
+  -R, --remote          connect to remote frida-server
+  -H HOST, --host=HOST  connect to remote frida-server on HOST
+  -f FILE, --file=FILE  spawn FILE
+  -p PID, --attach-pid=PID
+                        attach to PID
+  -l SCRIPT, --load=SCRIPT
+                        load SCRIPT
+  -P PARAMETERS_JSON, --parameters=PARAMETERS_JSON
+                        parameters as JSON, same as Gadget
+  -c CODESHARE_URI, --codeshare=CODESHARE_URI
+                        load CODESHARE_URI
+  -e CODE, --eval=CODE  evaluate CODE
+  -q                    quiet mode (no prompt) and quit after -l and -e
+  --no-pause            automatically start main thread after startup
+  -o LOGFILE, --output=LOGFILE
+                        output to log file
+  --exit-on-error       exit with code 1 after encountering any exception in
+                        the SCRIPT						
+					</code></pre>
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<section>
+						<h2>Ejemplos basicos de Frida</h2>
+						<p>ejemplo basico de API</p>
+					</section>
+					<section>
+						<h2>BasicCalculator</h2>
+						<p>Para instalar, parados en la carpeta root del git:</p>
+						<pre><code>
+adb shell settings put global verifier_verify_adb_installs 0
+adb install -t aplicaciones/basiccalculator.apk							
+						</code></pre>
+						<p>Para que ese comando funcione se tiene que cumplir con las siguientes precondiciones:
+							<ul>
+								<li>adb se tiene que encontrar instalado y en el PATH</li>
+								<li>El celular o emulador tiene que estar conectado y ser alcanzable mediante adb</li>
+								<li>Tiene que haber un solo dispositivo a la vez, sino se tiene que elegir en cual correr adb</li>
+								<li>El dispositivo tiene que permitir instalar aplicaciones de fuentes desconocidas (en emuladores eso se encuentra configurado por defecto)</li>
+							</ul>
+						</p>
+						<p>El codigo fuente se encuentra en aplicaciones/BasicCalculator</p>
+					</section>
+					<section>
+						<h2>Codigo en Java de aplicacion</h2>
+						<pre><code class="java">
+package com.example.ritesh.mybasiccalculator_riteshbhat;
+
+
+public class MainActivity extends AppCompatActivity implements View.OnClickListener {
+
+    private Integer add(int int1, int int2) {
+        return int1 + int2;
+    }
+
+    @Override
+    public void onClick(View view)
+    {
+        String num1=editText.getText().toString();
+        String num2=editText2.getText().toString();
+        this.findViewById()
+        switch(view.getId())
+        {
+            case R.id.button:
+                int mul= multiply(Integer.parseInt(num1), Integer.parseInt(num2));
+                editText3.setText(String.valueOf(mul));
+            break;
+            case R.id.button2:
+                int add= add(Integer.parseInt(num1), Integer.parseInt(num2));
+                editText3.setText(String.valueOf(add));
+                break;
+            case R.id.button3:
+						</code></pre>
+					</section>
+					<section data-background-image="images/19366.jpg">
+						<h2>Codigo de Frida</h2>
+						<pre><code class="javascript">
+//frida -U --no-pause -f com.blog.mybasiccalculator_riteshbhat
+
+//Java.perform se asegura que la funcion que se pasa, corre en el thread de la VM
+Java.perform( function () { 
+	//Java.use devuelve un objeto de javascript wrappeada en una clase cargada en la VM
+	var activity_class = Java.use("com.blog.basiccalculator.MainActivity"); 
+	//forma de sobreescribir un metodo de una clase (en este caso el metodo add de la clase
+	// MainActivity)	
+	activity_class.add.implementation = function (int1, int2) { 
+		//console.log muestra por pantalla lo que se pasa 
+		console.log("[+] se llama add"); 
+		//this hace referencia al objeto del tipo MainActivity. 
+		return this.add(int1,int2); 
+	} 
+});
+
+
+						</code></pre>
+					</section>
+					<section data-background-image="images/19366.jpg">
+						<h2>Codigo de Frida (2)</h2>
+					<p>Se pueden modificar las funciones ya implementadas</p>
+<pre><code class="javascript">
+Java.perform( function () { 
+	var activity_class = Java.use("com.blog.basiccalculator.MainActivity"); 
+	activity_class.add.implementation = function (int1, int2) { 
+		console.log("[+] se llama add 2"); 
+		return this.add(int1,int2); } 
+});
+</code></pre>
+
+<p>Modificar el comportamiento completo de la funcion</p>
+<pre><code class="javascript">
+Java.perform( function () { 
+	var activity_class = Java.use("com.blog.basiccalculator.MainActivity"); 
+	activity_class.add.implementation = function (p_int1, p_int2) {
+ 
+		return p_int1 - p_int2; 
+	} 
+});
+</code></pre>
+					</section>
+					<section data-background-image="images/19366.jpg">
+						<h2>Codigo de Frida (3)</h2>
+						<p>Probemos con el segundo caso</p>
+<pre><code class="java">
+    private Integer sub(int int1, int int2) {
+        return int1 - int2;
+    }
+
+    public void onClick(View view)
+    {
+        ...
+        switch(view.getId())
+        {
+            case R.id.button3:
+                int sub=sub(Integer.parseInt(num1),Integer.parseInt(num2));
+                editText3.setText(String.valueOf(sub));
+                break;
+</code></pre>
+
+						<p>Codigo para el patch de sub</p> 
+<pre><code class="javascript">
+Java.perform( function () { 
+	var activity_class = Java.use("com.blog.basiccalculator.MainActivity"); 
+	activity_class.sub.implementation = function (p_int1, p_int2) {
+ 		return p_int1 + p_int2; 
+	} 
+});
+</code></pre>
+					</section>
+					<section data-background-image="images/19366.jpg">
+						<h2>Codigo de Frida (4)</h2>
+						<p  style="text-align:left;">Probemos con la modificacion en base al error</p>
+<pre><code class="javascript">
+Java.perform( function () { 
+	var activity_class = Java.use("com.blog.basiccalculator.MainActivity"); 
+	activity_class.sub.implementation = function (p_int1, p_int2) {
+		var Integer = Java.use("java.lang.Integer");
+    	//Usar operaciones de Integer para sumar. Primero se usa la funcion estatica sub que recibe dos int, en vez de Integer
+		return Integer.$new(p_int1 - p_int2);
+	} 
+});
+</code></pre>
+					<p style="text-align:left;">Se presentan una nueva funcion dentro de la API de Frida:</p>
+					<ul style="text-align:left;">
+						<li><b>ClassHandler.$new():</b> Es la forma de instanciar un objeto de Java a traves de la API de Frida.</li>
+					</section>
+					<section data-background-image="images/19366.jpg">
+						<h2>Codigo de Frida (5)</h2>
+						<p style="text-align:left;">Ejemplo de trackeo de funciones</p>
+
+<pre><code class="java">
+    public void BasicToast(View view)
+    {
+        Context context=getApplicationContext();
+        CharSequence text="Hello..This is toast..!!";
+        int duration= Toast.LENGTH_LONG;
+
+        Toast toast=Toast.makeText(context,text,duration);
+        toast.show();
+    }
+</code></pre>
+
+						<p style="text-align:left;">Script para trackear una funcion</p>
+<pre><code class="javascript">
+Java.perform( function() {
+	var activity_class = Java.use("com.blog.basiccalculator.MainActivity");
+	activity_class.BasicToast.implementation = function (view) {
+			Java.perform( function() {			
+				var bt = Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new());
+				console.log("\nBacktrace:\n" + bt);
+			});
+			this.BasicToast(view);	
+	}
+});
+</code></pre>
+					</section>
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<h2>Interceptando el trafico</h2>
+					<img src="images/interceptando-trafico.png" style="height:700px;">
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<section data-background-image="images/19366.jpg">
+						<h2>Network security config</h2>
+						<p>Se referencia un archivo en el AndroidManifest.xml:</p>
+						<img src="images/nsc1.png">
+						<p>Se agrega archivo res/xml/network_security_config.xml:</p>
+						<img src="images/nsc2.png">
+					</section>
+					<section data-background-image="images/19366.jpg">
+						<h2>Network security config bypass</h2>
+						<p style="text-align:left;">Modificar la version de <b>android:targetSdkVersion</b>. </p>
+						<img style="height:300px;" src="images/nsc-bypass1.png">
+						<p style="text-align:left;">Se puede modificar la configuracion de *network-security-config* o agregarla.</p>
+						<img src="images/nsc-bypass2.png">
+					</section>
+					<section data-background-image="images/19366.jpg">
+						<h2>Network security config bypass (2)</h2>
+						<p style="text-align:left;">Se puede usar un script de Frida para hacer un patch. </p>
+<pre><code class="javascript">
+// frida -U -l network-security-config-bypass.js --no-pause -f com.example.bypassnsc 
+Java.perform(function(){
+    var NetworkSecurityConfig_Builder =Java.use("android.security.net.config.NetworkSecurityConfig$Builder");
+	console.log("NetworkSecurityConfig_Builder: " + NetworkSecurityConfig_Builder);
+    var CertificatesEntryRef = Java.use("android.security.net.config.CertificatesEntryRef");
+	console.log("CertificatesEntryRef: " + CertificatesEntryRef);
+    var CertificateSource = Java.use("android.security.net.config.CertificateSource");
+	console.log("CertificateSource: " + CertificateSource);
+    var UserCertificateSource = Java.use("android.security.net.config.UserCertificateSource");
+	console.log("UserCertificateSource: " + UserCertificateSource);
+
+    NetworkSecurityConfig_Builder.getEffectiveCertificatesEntryRefs.implementation = function(){
+	console.log("entra");
+        var origin = this.getEffectiveCertificatesEntryRefs()
+        
+        var source = UserCertificateSource.getInstance()
+        var userCert = CertificatesEntryRef.$new(source,true)
+        origin.add(userCert)
+
+	return origin
+    }
+})
+</code></pre>
+					</section>
+					<section data-background-image="images/19366.jpg">
+						<h2>Network security config bypass (3)</h2>
+						<p style="text-align:left;">No todos los scripts funcionan siempre, hay que ver la version de la API inicialmente, y saber seleccionar cual conviene. </p>
+						<p style="text-align:left;">El siguiente grafico muetra un analisis de distintos scripts para distintas APIs y distintas versiones:</p>
+						<img src="images/nsc-bypass3.png">
+
+						<p style="text-align:left;">Para mas detalles ver <a href="https://neo-geo2.gitbook.io/adventures-on-security/frida/analysis-of-network-security-configuration-bypasses-with-frida">Scripts de bypass de NSC</a></p>
+
+					</section>
+					<section>
+						<h2>BypassNSC</h2>
+						<p>Para instalar, parados en la carpeta root del git:</p>
+						<pre><code>
+adb shell settings put global verifier_verify_adb_installs 0
+adb install -t aplicaciones/bypassnsc.apk							
+						</code></pre>
+						<p>Para que ese comando funcione se tiene que cumplir con las siguientes precondiciones:
+							<ul>
+								<li>adb se tiene que encontrar instalado y en el PATH</li>
+								<li>El celular o emulador tiene que estar conectado y ser alcanzable mediante adb</li>
+								<li>Tiene que haber un solo dispositivo a la vez, sino se tiene que elegir en cual correr adb</li>
+								<li>El dispositivo tiene que permitir instalar aplicaciones de fuentes desconocidas (en emuladores eso se encuentra configurado por defecto)</li>
+							</ul>
+						</p>
+						<p>El codigo fuente se encuentra en aplicaciones/BypassNSC</p>
+					</section>
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<section data-background-image="images/19366.jpg">
+						<h2>Certificate Pinning</h2>
+						<p style="text-align:left;">Modo de validar el certificado entregado por el servidor.
+							<ul>
+								<li>Control de seguridad para evitar ataques del tipo MitM</li>
+								<li>Se puede pinnear:
+								 <ul>
+								 	<li>un conjunto de certificados (archivos)</li>
+									<li>PKI - Subject Public Key</li>
+								  </ul>
+								</li>
+								<li>El método más recomendado es el de Subject Public Key (administración, instalación, control)</li>
+							</ul>
+						</p>
+						<img src="images/certificate-pinning1.png">
+					</section>
+					<section data-background-image="images/19366.jpg">
+						<h2>Certificate Pinning (2)</h2>
+						<img style="height:650px;" src="images/certificate-pinning2.png">
+					</section>
+					<section data-background-image="images/19366.jpg">
+						<h2>Certificate Pinning (3)</h2>
+						<p>Es mas complicado. Hay muchas formas de hacerlo, muchas custom made, por ejemplo:</p>
+						<ul>
+							<li>CertificatePinner (libreria OkHttp)</li>
+							<li>Retrofit  (OkHttp v3)</li>
+							<li>TrustManagerImpl(en sdk de android)
+								<ul>
+									<li>Mediante certificados en dispositivo.</li>
+									<li>Mediante PKI en codigo o parametros.</li>
+								</ul>
+							</li>
+							<li>NetworkSecurityConfig (Usa TrustManagerImpl de fondo)</li>
+							<li>Custom-made</li>
+						</ul>
+						<img src="images/certificate-pinning3.png">
+					</section>
+					<section data-background-image="images/19366.jpg">
+						<h2>Certificate Pinning (4)</h2>
+						<p>Bypass OkHttp:</p>
+<pre><code class="java">
+public boolean testOkHttp() {
+    String hostname = "example.org";
+    CertificatePinner certificatePinner = new CertificatePinner.Builder().add(hostname, "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=").build();
+    OkHttpClient client = new OkHttpClient.Builder().certificatePinner(certificatePinner).build();
+
+    Request request = new Request.Builder().url("https://" + hostname).build();
+    try {
+        client.newCall(request).execute();
+        exito = true;
+    } catch (IOException e) { e.printStackTrace(); }
+    return exito;
+}
+</code></pre>
+<pre><code class="javascript">
+Java.perform(function () {
+	try {
+        var CertificatePinner = Java.use('okhttp3.CertificatePinner');
+        console.log("[+] OkHTTP 3.x Found");
+        CertificatePinner.check.overload('java.lang.String', 'java.util.List').implementation = function() {
+            console.log("[+] OkHTTP 3.x check() called. Not throwing an exception.");
+        };
+    } catch (err) {
+        console.log("[-] OkHTTP 3.x Not Found")
+    }	
+});					
+</code></pre>
+					</section>
+					<section data-background-image="images/19366.jpg">
+						<h2>Certificate Pinning (5)</h2>
+						<p>Como harian para bypasear lo siguiente?</p>
+<pre><code class="java">
+@RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
+public boolean testHttpUrlConnection() {
+    HttpUrlConnectPinner httpUrlConnectPinner = new HttpUrlConnectPinner();
+    return httpUrlConnectPinner.testPinning();
+}
+
+public class HttpUrlConnectPinner {
+
+    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
+    private void validatePinning(
+            X509TrustManagerExtensions trustManagerExt,
+            HttpsURLConnection conn, Set&lt;String&gt; validPins)
+            throws SSLException {
+        String certChainMsg = "";
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            ...
+        } catch (NoSuchAlgorithmException e) {
+            throw new SSLException(e);
+        }
+        throw new SSLPeerUnverifiedException("Certificate pinning " +
+                "failure\n  Peer certificate chain:\n" + certChainMsg);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
+    private List&lt;X509Certificate&gt; trustedChain(
+            X509TrustManagerExtensions trustManagerExt,
+            HttpsURLConnection conn) throws SSLException {
+        Certificate[] serverCerts = conn.getServerCertificates();
+        ...
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
+    public boolean testPinning() {
+        TrustManagerFactory trustManagerFactory =
+                null;
+        try {
+            trustManagerFactory = TrustManagerFactory.getInstance(
+                    TrustManagerFactory.getDefaultAlgorithm());
+
+            ...
+        }
+        return false;
+    }
+}
+
+
+</code></pre>						
+					</section>
+					<section>
+						<h2>TestingCertificatePinning</h2>
+						<p>Para instalar, parados en la carpeta root del git:</p>
+						<pre><code>
+adb shell settings put global verifier_verify_adb_installs 0
+adb install -t aplicaciones/testcertificate.apk							
+						</code></pre>
+						<p>Para que ese comando funcione se tiene que cumplir con las siguientes precondiciones:
+							<ul>
+								<li>adb se tiene que encontrar instalado y en el PATH</li>
+								<li>El celular o emulador tiene que estar conectado y ser alcanzable mediante adb</li>
+								<li>Tiene que haber un solo dispositivo a la vez, sino se tiene que elegir en cual correr adb</li>
+								<li>El dispositivo tiene que permitir instalar aplicaciones de fuentes desconocidas (en emuladores eso se encuentra configurado por defecto)</li>
+							</ul>
+						</p>
+						<p>El codigo fuente se encuentra en aplicaciones/TestingCertificatePinning</p>
+					</section>
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<section data-background-image="images/19366.jpg">
+						<h2>Control de Root</h2>
+						<ul>
+							<li>Existencia de paquetes o archivos particulares como
+								<ul>
+									<li>/system/app/Superuser.apk</li>
+									<li>eu.chainfire.supersu</li>
+								</ul>
+							</li>
+							<li>Existencia de “su”Buscar en directorios (/sbin/su, /system/su, etc)</li>
+							<li>Ejecutar mediante Runtime.getRuntime().exec()</li>
+							<li>Revisar los procesos que corren en /proc</li>
+							<li>Ver permisos de diferentes directorios</li>
+						</ul>
+						<p><b>Hay muchas soluciones custom-made porque la complejidad de desarrollo es baja</b></p>
+					</section>
+					<section>
+						<h2>Rootbeer Example</h2>
+						<p>Para instalar, se puede descargar Google Play en <a href="https://play.google.com/store/apps/details?id=com.scottyab.rootbeer.sample">RootBeer</a></p>
+						<p>El apk se puede descargar tambien desde <a href="https://apkpure.com/rootbeer-sample/com.scottyab.rootbeer.sample">RootBeer</a></p>
+						<p>El codigo de la aplicacion y la libreria se encuentra en el siguiente repositorio de github: <a href="https://github.com/scottyab/rootbeer">RootBeer</a></p>
+					</section>
+					<section data-background-image="images/19366.jpg">
+						<h2>Control de Root (2)</h2>
+						<p style="text-align:left;">Un libreria muy buena para detectar root se llama "rootber"</p>
+						<p style="text-align:left;">El siguiente codigo es sacado de la aplicacion de ejemplo que usa la libreria:</p>
+<pre><code class="java">
+import com.scottyab.rootbeer.RootBeer;
+...
+
+	RootBeer check = new RootBeer(mContext);
+        check.checkForNativeLibraryReadAccess();
+        check.setLogging(true);
+				 ...
+                case 24:
+                    mIsCheck = check.detectTestKeys();
+                    Log.d(TAG, "TestKeys " + (mIsCheck ? "detected" : "not detected"));
+                    break;           
+</code></pre>
+						<p style="text-align:left;">El control de test keys que daba positivo se puede patchear de la siguiente forma:</p>
+<pre><code class="javascript">
+Java.perform( function () {
+	var rootbeer = Java.use("com.scottyab.rootbeer.RootBeer");
+	rootbeer.detectTestKeys.implementation = function () {
+		console.log("Entra");
+		return false;
+	}
+});
+</code></pre>
+					</section>
+					<section data-background-image="images/19366.jpg">
+						<h2>Control de Root (3)</h2>
+						<p style="text-align:left;">Veamos el siguiente control de root:</p>
+<pre><code class="java">
+public class RootBeer {
+	public boolean checkForRootNative() {
+
+        ...
+        RootBeerNative rootBeerNative = new RootBeerNative();
+        try {
+            rootBeerNative.setLogDebugMessages(loggingEnabled);
+            return rootBeerNative.checkForRoot(checkPaths) > 0;
+        } catch (UnsatisfiedLinkError e) {
+            return false;
+        }
+    }
+
+}
+
+public class RootBeerNative {
+	
+	static {
+        try {
+            System.loadLibrary("tool-checker");
+            libraryLoaded = true;
+    ...
+    public native int checkForRoot(Object[] pathArray);
+    public native int setLogDebugMessages(boolean logDebugMessages);
+}
+</code></pre>						
+					</section>
+					<section>
+						<h2>Control de Root (4)</h2>
+<pre><code class="c">
+int Java_com_scottyab_rootbeer_RootBeerNative_checkForRoot( JNIEnv* env, jobject thiz, jobjectArray pathsArray )
+{
+
+    int binariesFound = 0;
+    int stringCount = (env)-&gt;GetArrayLength(pathsArray);
+
+    for (int i=0; i&lt;stringCount; i++) {
+        jstring string = (jstring) (env)-&gt;GetObjectArrayElement(pathsArray, i);
+        const char *pathString = (env)-&gt;GetStringUTFChars(string, 0);
+
+	binariesFound+=exists(pathString);
+	(env)-&gt;ReleaseStringUTFChars(string, pathString);
+    }
+	return binariesFound>0;
+}
+</code></pre>
+<pre><code class="javascript">
+Interceptor.attach(Module.findExportByName("libtool-checker.so","Java_com_scottyab_rootbeer_RootBeerNative_checkForRoot"),{
+    onEnter: function(args) {
+        console.log("entra a la funcion");
+    },
+    onLeave: function(retval) {
+    		console.log("sale de la funcion");
+     		retval.replace(0);   
+    }
+});
+</code></pre>
+					</section>
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<h2>Codigo Ofuscado</h2>
+					<p>Ver <a href="https://codeshare.frida.re/@dzonerzy/fridantiroot/">frida antiroot script</a></p>
+					<p>Solucion a uncrackable Lvl 1 (<a href="https://github.com/OWASP/owasp-mstg/tree/master/Crackmes">Crackmes</a>)</p>
+					<img src="images/codigo-ofuscado.png">
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<h2>Fuzzing</h2>
+					<p style="text-align:left;">Se puede armar un fuzzer para Java o C rapidamente (black-box):</p>
+					<ul style="text-align:left;">
+						<li>Definir la funcion o funciones a fuzzear</li>
+						<li>Analizar el tipo de input que puede recibir</li>
+						<li>Armar un ciclo while y una funcion que genere variantes de input</li>
+						<li>Proteger el proceso con bloques try/catch</li>
+						<li>En Java guardar crashes (verificar cuando se genera una excepcion)</li>
+						<li>Monitorear logcat para verificar crashes y los archivos generados en /data/tombstone</li> 
+					</ul>
+					<p style="text-align:left;">Existen fuzzers mas complejos:</p>
+					<ul style="text-align:left;">
+						<li><a href="https://github.com/andreafioraldi/frida-fuzzer">Frida API Fuzzer</a></li>
+						<li><a href="https://github.com/NMHai/frida-qbdi-fuzzer">Frida/QBDI Android API Fuzzer</a></li>
+						<li><a href="https://conference.hitb.org/hitbsecconf2019ams/materials/D1T2%20-%20Hourglass%20Fuzz%20-%20A%20Quick%20Bug%20Hunting%20Method%20-%20Moony%20Li,%20Todd%20Han,%20Lance%20Jiang%20&%20Lilang%20Wu.pdf">Hourglassfuzz</a></li>
+					</ul>
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<h2>Tools mas utilizadas</h2>
+					<ul style="text-align:left;">
+						<li>Objection</li>
+						<li>house</li>
+						<li>RMS (Runtime Mobile Security)</li>
+						<li>Dwarf</li>
+					</ul>
+					<h2>Referencias</h2>
+					<ul>
+						<li>https://www.frida.re/</li>
+						<li>https://github.com/dweinstein/awesome-frida</li>
+						<li>https://github.com/sensepost/objection</li>
+						<li>https://codeshare.frida.re/	</li>
+						<li>https://neo-geo2.gitbook.io/adventures-on-security/frida-scripting-guide/frida-scripting-guide</li>
+					</ul>
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<section>
+						<h2>Demo time</h2>
+					</section>
+					<section>
+						<h2>Pixel Dungeon</h2>
+						<p>Para instalar, se puede descargar Google Play en <a href="https://play.google.com/store/apps/details?id=com.watabou.pixeldungeon&hl=es_AR">Pixel Dungeon</a></p>
+						<p>El apk se puede descargar tambien desde <a href="https://apkpure.com/pixel-dungeon/com.watabou.pixeldungeon">Pixel Dungeon</a></p>
+						<p>El codigo de la aplicacion y la libreria se encuentra en el siguiente repositorio de github: <a href="https://github.com/watabou/pixel-dungeon">Pixel Dungeon</a></p>
+					</section>
+					<section>
+						<p>Listar las clases cargadas</p>
+<pre><code class="javascript">
+	Java.perform( function() {
+		    var allClasses = [];
+	    var classes = Java.enumerateLoadedClassesSync();
+
+	    classes.forEach(function(aClass) {
+	    	if (aClass.startsWith("com.watabou")) {
+	    		console.log(aClass);
+	        }
+	    });
+	});
+</code></pre>
+					</section>
+					<section>
+						<p>Listar metodos de una clase</p>
+<pre><code class="javascript">
+var classItem = null;
+
+var listMethods = function (className) {
+	Java.perform(function () { 
+		var hook = Java.use(className);
+	    var ownMethods = hook.class.getDeclaredMethods();
+	    ownMethods.forEach(function (method) {
+	    	console.log(method);
+	    });
+	    hook.$dispose;
+	});
+}
+
+listMethods("com.watabou.pixeldungeon.actors.hero.Hero");
+</code></pre>
+					</section>
+					<section>
+						<p>Listar campos de una clase</p>
+<pre><code class="javascript">
+var listFields = function (className) {
+	Java.perform(function () { 
+	    var hook = Java.use(className);
+	    var ownMethods = hook.class.getDeclaredFields();
+	    ownMethods.forEach(function (method) {
+	    	console.log(method);
+	    });
+	    hook.$dispose;
+	});
+}
+
+listFields("com.watabou.pixeldungeon.actors.hero.Hero");
+</code></pre>
+					</section>	
+					<section>
+						<p>Chequear superclase</p>
+<pre><code class="javascript">
+var checkSuperClass = function (className) {
+	Java.perform( function() {
+	    var hook = Java.use(className);
+	    console.log(hook.class.getSuperclass());
+	    hook.$dispose;
+	 });	
+} 
+
+checkSuperClass("com.watabou.pixeldungeon.actors.hero.Hero");
+</code></pre>
+					</section>		
+					<section>
+						<p>Listar contenido de heroe</p>
+<pre><code class="javascript">
+ Java.perform(function () { 
+
+        Java.choose("com.watabou.pixeldungeon.actors.hero.Hero", {
+            onMatch: function (hero) {
+            	console.log("Basic stats:");
+                console.log("level:" + hero.lvl.value);
+              	console.log("exp:" + hero.exp.value);
+                console.log("STR STAT:" + hero._STR.value);
+                //cast a Char
+                var charClass = Java.use("com.watabou.pixeldungeon.actors.Char");
+                var charObj = Java.cast(hero,charClass);
+                console.log("HT STAT:" + charObj.HT.value);
+                console.log("HP STAT:" + charObj.HP.value);
+                console.log("Start restoring health:" + hero.restoreHealth.value);
+                console.log("Character is weakened:" + hero.weakened.value);
+                console.log("Awareness level:" + hero.awareness.value);
+                console.log("Derived stats:");
+                console.log("strength:" + hero.STR());
+                console.log("attack_skill:" + hero.attackSkill(hero));
+                console.log("defense_skill:" + hero.defenseSkill(hero));
+                console.log("defense rating:" + hero.dr());
+                //mostrar las cosas que tiene guardadas
+                var iterator = hero.belongings.bagpack.items.iterator();
+                var Item = Java.use("com.watabou.pixeldungeon.items.Item");
+                
+                console.log("Items poseidos:");
+                while (iterator.hasNext()) {
+                	var itemFromBag = iterator.next();
+                	var castedItem = Java.cast(itemFromBag,Item);
+                	console.log("-> " + castedItem.name + "(" + castedItem.quantity + ")");
+                }
+                  
+            },
+            onComplete: function () { }
+                }
+
+        });
+
+    });
+</code></pre>
+					</section>
+					<section>
+						<p>Loguear acciones de heroe</p>
+<pre><code class="javascript">
+var listFilteredMethods = function (className) {
+	var hook = Java.use(className);
+    var ownMethods = hook.class.getDeclaredMethods();
+    ownMethods.forEach(function (method) {
+    	if (method.toString().includes("Hero.act")) {
+    		console.log(method);
+    	}
+    });
+    hook.$dispose;
+}
+
+Java.perform( function() {
+    listFilteredMethods("com.watabou.pixeldungeon.actors.hero.Hero");
+});
+
+
+Java.perform(function () { 
+
+var Hero = Java.use("com.watabou.pixeldungeon.actors.hero.Hero");
+
+Hero.actAscend.implementation = function (ascend) {
+	console.log("Ascencion move");
+	console.log(Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new()));
+		return this.actAscend(ascend);
+}
+
+
+Hero.actAttack.implementation = function (attack) {
+	console.log("Attack move");
+	console.log(Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new()));
+		return this.actAttack(attack);
+}
+
+Hero.actBuy.implementation = function (buy) {
+	console.log("Buy move");
+	console.log(Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new()));
+		return this.actBuy(buy);
+}
+
+Hero.actCook.implementation = function (cook) {
+	console.log("Cooking move");
+	console.log(Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new()));
+		return this.actCook(cook);
+}
+
+
+Hero.actDescend.implementation = function (descend) {
+	console.log("Descend move");
+	console.log(Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new()));
+		return this.actDescend(descend);
+}
+
+Hero.actInteract.implementation = function (interaction) {
+	console.log("Interaction move");
+	console.log(Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new()));
+		return this.actInteract(interaction);
+}
+
+Hero.actMove.implementation = function (move) {
+	console.log("Movement move");
+	console.log(Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new()));
+		return this.actMove(move);
+}
+
+Hero.actOpenChest.implementation = function (openChest) {
+	console.log("Open Chest move");
+	console.log(Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new()));
+		return this.actOpenChest(openChest);
+}
+
+Hero.actPickUp.implementation = function (pickUp) {
+	console.log("Pick up move");
+	console.log(Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new()));
+		return this.actPickUp(pickUp);
+}
+
+Hero.actUnlock.implementation = function (unlock) {
+	console.log("Ascencion move");
+	console.log(Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new()));
+		return this.actUnlock(unlock);
+}
+
+});
+</code></pre>
+					</section>	
+					<section>
+						<p>Analisis del movimiento</p>
+<p>1) Veo qué tiene HeroAction:</p>
+
+<pre><code class="javascript">
+ listFields("com.watabou.pixeldungeon.actors.hero.HeroAction$Move");
+
+//no hay nada
+listFields("com.watabou.pixeldungeon.actors.hero.HeroAction");
+
+//hay un int dst. Vamos a probar si podemos imprimir esto desde la acción de moverse:
+
+Java.perform( function() {
+	var Hero = Java.use("com.watabou.pixeldungeon.actors.hero.Hero");
+	Hero.actMove.implementation = function (move) {
+		console.log("Movement move");
+		console.log("dst->" + move.dst.value);
+		console.log(Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new()));
+			return this.actMove(move);
+	}	
+});
+</code></pre>
+					</section>	
+					<section>
+<p>2) Hacer un par de movimientos</p>
+
+<pre><code class="javascript">
+Java.perform(function () { 
+
+    Java.choose("com.watabou.pixeldungeon.actors.hero.Hero", {
+        onMatch: function (hero) {
+
+        	 console.log("position: " + hero.pos.value);
+
+			 var Move = Java.use("com.watabou.pixeldungeon.actors.hero.HeroAction$Move");
+			 var move = Move.$new(827);
+			 hero.actMove(move);       	
+		},
+        onComplete: function () { }
+    
+    });
+
+});
+</code></pre>
+					</section>
+					<section>
+						<p>Script para automatizar el movimiento</p>
+
+<pre><code class="javascript">
+var moveUp = function () {
+	Java.perform(function () { 
+
+	    Java.choose("com.watabou.pixeldungeon.actors.hero.Hero", {
+	        onMatch: function (hero) {
+
+	        	 var posActual = hero.pos.value;
+
+				 var Move = Java.use("com.watabou.pixeldungeon.actors.hero.HeroAction$Move");
+				 if (posActual >= 32) {
+				 	var move = Move.$new(hero.pos.value -32);
+				 	hero.actMove(move);
+				 }
+       	
+			},
+	        onComplete: function () { }
+	    
+	    });
+
+	});	
+}
+
+var moveDown = function () {
+	Java.perform(function () { 
+
+	    Java.choose("com.watabou.pixeldungeon.actors.hero.Hero", {
+	        onMatch: function (hero) {
+
+	        	 var posActual = hero.pos.value;
+
+				 var Move = Java.use("com.watabou.pixeldungeon.actors.hero.HeroAction$Move");
+				 var move = Move.$new(hero.pos.value +32);
+				 hero.actMove(move);
+			},
+	        onComplete: function () { }
+	    });
+	});	
+}
+
+var moveLeft = function () {
+	Java.perform(function () { 
+
+	    Java.choose("com.watabou.pixeldungeon.actors.hero.Hero", {
+	        onMatch: function (hero) {
+
+	        	 var posActual = hero.pos.value;
+
+				 var Move = Java.use("com.watabou.pixeldungeon.actors.hero.HeroAction$Move");
+				 var move = Move.$new(hero.pos.value -1);
+				 hero.actMove(move);
+			},
+	        onComplete: function () { }
+	    });
+	});	
+}
+
+var moveRight = function () {
+	Java.perform(function () { 
+
+	    Java.choose("com.watabou.pixeldungeon.actors.hero.Hero", {
+	        onMatch: function (hero) {
+
+	        	 var posActual = hero.pos.value;
+
+				 var Move = Java.use("com.watabou.pixeldungeon.actors.hero.HeroAction$Move");
+				 var move = Move.$new(hero.pos.value +1);
+				 hero.actMove(move);
+			},
+	        onComplete: function () { }
+	    });
+	});	
+}
+</code></pre>
+					</section>
+					<section>
+						<p>Mejora del script anterior</p>
+<pre><code class="javascript">
+var referenceHero = null;
+
+var getHeroReference = function () {
+	Java.perform(function () { 
+
+	    Java.choose("com.watabou.pixeldungeon.actors.hero.Hero", {
+	        onMatch: function (hero) {
+	        	console.log(hero);
+	        	referenceHero = hero;
+			},
+	        onComplete: function () { }
+	    });
+	});	
+}
+
+var moveRight = function () {
+	Java.perform(function () { 
+
+	    var posActual = referenceHero.pos.value;
+
+		var Move = Java.use("com.watabou.pixeldungeon.actors.hero.HeroAction$Move");
+		var move = Move.$new(referenceHero.pos.value +1);
+		referenceHero.actMove(move);
+		});	
+}
+
+var moveLeft = function () {
+	Java.perform(function () { 
+
+	    var posActual = referenceHero.pos.value;
+
+		var Move = Java.use("com.watabou.pixeldungeon.actors.hero.HeroAction$Move");
+		var move = Move.$new(referenceHero.pos.value -1);
+		referenceHero.actMove(move);
+		});	
+}
+
+var moveDown = function () {
+	Java.perform(function () { 
+
+	    var posActual = referenceHero.pos.value;
+
+		var Move = Java.use("com.watabou.pixeldungeon.actors.hero.HeroAction$Move");
+		var move = Move.$new(referenceHero.pos.value +32);
+		referenceHero.actMove(move);
+		});	
+}
+
+var moveUp = function () {
+	Java.perform(function () { 
+
+	    var posActual = referenceHero.pos.value;
+
+		var Move = Java.use("com.watabou.pixeldungeon.actors.hero.HeroAction$Move");
+		var move = Move.$new(referenceHero.pos.value -32);
+		referenceHero.actMove(move);
+		});	
+}
+</code></pre>
+					</section>
+					<section>
+						<p>Cheat time</p>
+<pre><code class="javascript">
+Java.perform(function () {
+    Char = Java.use("com.watabou.pixeldungeon.actors.Char");
+
+    Java.choose("com.watabou.pixeldungeon.actors.hero.Hero", {
+            onMatch: function (hero) {
+                var char = Java.cast(hero,Char);
+                console.log(char.HP.value);
+                console.log(char.HT.value); //este debe ser el total  
+            },
+            onComplete: function () { }
+        });
+});
+
+//full HP
+Java.perform(function () {
+    Char = Java.use("com.watabou.pixeldungeon.actors.Char");
+
+    Java.choose("com.watabou.pixeldungeon.actors.hero.Hero", {
+        onMatch: function (hero) {
+            var char = Java.cast(hero,Char);
+            char.HP.value = 25;
+        },
+        onComplete: function () { }
+    });
+});
+
+//TRUE DAMAGE
+Java.perform(function () {
+    Java.choose("com.watabou.pixeldungeon.actors.hero.Hero", {
+        onMatch: function (hero) {
+
+            var Mob = Java.use("com.watabou.pixeldungeon.actors.mobs.Mob");
+            var Char = Java.use("com.watabou.pixeldungeon.actors.Char");
+            var iterator = hero._visibleEnemies.value.iterator();        
+            while (iterator.hasNext()) {
+                var enemyMob = iterator.next();
+                var theMob = Java.cast(enemyMob,Mob);
+                var theChar = Java.cast(enemyMob,Char);
+                theChar.damage(1, theChar);
+                console.log(theMob.$className);
+                console.log(theChar.HP.value);
+                      
+            }
+        },
+        onComplete: function () { }
+    });
+});
+
+
+Java.perform(function () {
+    Char = Java.use("com.watabou.pixeldungeon.actors.Char");
+
+    Java.choose("com.watabou.pixeldungeon.actors.hero.Hero", {
+        onMatch: function (hero) {
+            hero.STR.value = 25;
+        },
+        onComplete: function () { }
+    });
+});
+
+
+//open any chest
+Java.perform( function () {
+        Java.choose("com.watabou.pixeldungeon.actors.hero.Hero", {
+            onMatch: function (hero) {
+                var Heap = Java.use("com.watabou.pixeldungeon.items.Heap");
+                var Dungeon = Java.use("com.watabou.pixeldungeon.Dungeon"); 
+                var genericHeap = Dungeon.level.value.heaps.value.get( 92 );
+                var heap = Java.cast(genericHeap, Heap);
+                heap.open(hero);            
+            },
+            onComplete: function () { }
+        });
+    });
+
+var isBadBuff = function (className) {
+    if (className.includes('Satiety')) return true;
+    if (className.includes('Haste')) return true;
+    return false;
+}
+
+//remove bad buffers
+Java.perform( function () {
+        Java.choose("com.watabou.pixeldungeon.actors.hero.Hero", {
+            onMatch: function (hero) {
+                var Char = Java.use("com.watabou.pixeldungeon.actors.Char");
+                var character = Java.cast(hero,Char);
+                var iterator = character._buffs.value.iterator();
+                
+                var buffToRemove = new Array();
+                while (iterator.hasNext()) {
+                    var buff = iterator.next();
+                    if (isBadBuff(buff.$className)) {
+                        buffToRemove.push(buff);
+                    }
+                    console.log(buff.$className);
+                }
+                for (var i = 0; i < buffToRemove.length; i++) {
+                    character._buffs.value.remove(buffToRemove[i]);    
+                }
+            },
+            onComplete: function () { }
+        });
+    });
+
+Java.perform(function () {
+    var Hunger = Java.use("com.watabou.pixeldungeon.actors.buffs.Hunger");
+    Hunger.isStarving.implementation = function () {
+        return false;
+    }
+});
+
+Java.perform( function () {
+
+    var Heap = Java.use("com.watabou.pixeldungeon.items.Heap");
+    var Dungeon = Java.use("com.watabou.pixeldungeon.Dungeon"); 
+    var genericHeap = Dungeon.level.value.heaps.value.get( 92 );
+    var heap = Java.cast(genericHeap, Heap);
+    heap.open(hero);
+});
+
+
+//how to get all the map visible
+Java.perform(function() {
+    var Dungeon = Java.use("com.watabou.pixeldungeon.Dungeon");
+    console.log(Dungeon.level.value.LENGTH.value);
+    var Arrays = Java.use("java.util.Arrays");
+    var arrayLength = Dungeon.visible.value.length;
+    for (var i = 0; i < arrayLength; i++) {
+        Dungeon.visible.value[i] = true;
+        Dungeon.level.value.visited.value[i] = true;
+        Dungeon.level.value.mapped.value[i] = true;
+        Dungeon.level.value.fieldOfView.value[i] = true;
+    }
+
+    var Level = Java.use("com.watabou.pixeldungeon.levels.Level");
+    Level.updateFieldOfView.implementation = function (char) {
+        return this.fieldOfView.value;
+    };
+});
+
+//receive no damage
+Java.perform(function () {
+    var Char = Java.use("com.watabou.pixeldungeon.actors.Char");
+    Char.damage.implementation = function (dmg,src) {
+        if (!this.$className.includes('Hero')) {
+            this.damage(dmg,src);
+        } else {
+            this.damage(0,src);
+        }
+    }
+});
+</code></pre>
+					</section>
+
+				</section>
+				<section data-background-image="images/19366.jpg">
+					<h2>Preguntas?</h2>
+					<br>
+					<br>
+					<br>
+					<p>Me pueden contactar mediante:</p>
+					<ul>
+						<li>Twitter: <a href="https://twitter.com/warlockk87">@warlockk87</a>
+						</li>
+						<li>Linkedin: <a href="https://www.linkedin.com/in/cesar-mario-rodriguez/">Cesar Rodriguez</a>
+						</li>
+						<li>
+						Canal de Slack <a href="https://join.slack.com/t/android-latam/shared_invite/zt-e6nmt95x-HY8_dp4bN18_rOdUpl7XaQ">android-latam</a>	
+						</li>
+					</ul>
+					<br>
+					<br>
+					<p>Les dejo el link del repo de Github donde voy a subir el material: <a href="https://github.com/CesarMRodriguez/OwaspLatamHome2020">link</a></p>
+
+				</section>
+					
+			</div>
+		</div>
+
+		<script src="js/reveal.js"></script>
+
+		<script>
+			// More info about config & dependencies:
+			// - https://github.com/hakimel/reveal.js#configuration
+			// - https://github.com/hakimel/reveal.js#dependencies
+			Reveal.initialize({
+				hash: true,
+				width: "100%",
+				height: "100%",
+				dependencies: [
+					{ src: 'plugin/markdown/marked.js' },
+					{ src: 'plugin/markdown/markdown.js' },
+					{ src: 'plugin/highlight/highlight.js' },
+					{ src: 'plugin/notes/notes.js', async: true }
+				]
+			});
+		</script>
+	</body>
+</html>
